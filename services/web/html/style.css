@@ -1,0 +1,83 @@
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1c2330;
+  --muted: #667085;
+  --accent: #2f6fed;
+  --ok: #17803d;
+  --warn: #b45309;
+  --bad: #b42318;
+  --line: #e2e5ea;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+h1 { margin: 0; font-size: 22px; }
+h2 { font-size: 16px; margin: 24px 0 12px; }
+h2 small { color: var(--muted); font-weight: normal; }
+main { max-width: 900px; margin: 0 auto; padding: 0 24px 48px; }
+
+.badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--line); }
+.badge.up { background: #dcfce7; color: var(--ok); }
+.badge.down { background: #fee4e2; color: var(--bad); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.card h3 { margin: 0 0 8px; font-size: 15px; }
+.card p { margin: 4px 0; }
+.price { font-weight: 600; }
+.stock { color: var(--muted); font-size: 13px; }
+
+button {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+button:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+th { color: var(--muted); font-weight: 600; }
+
+.status { font-weight: 600; }
+.status.pending { color: var(--warn); }
+.status.processed { color: var(--ok); }
+
+#message { max-width: 900px; margin: 0 auto; padding: 0 24px 24px; font-size: 14px; }
+#message.ok { color: var(--ok); }
+#message.error { color: var(--bad); }

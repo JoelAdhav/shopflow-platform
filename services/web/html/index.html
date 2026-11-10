@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopFlow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>ShopFlow</h1>
+    <span id="api-status" class="badge">checking api...</span>
+  </header>
+
+  <main>
+    <section>
+      <h2>Products</h2>
+      <div id="products" class="grid"></div>
+    </section>
+
+    <section>
+      <h2>Recent orders <small>(refreshes every 2s)</small></h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Product</th><th>Qty</th><th>Status</th><th>Created</th></tr>
+        </thead>
+        <tbody id="orders"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <p id="message" role="status"></p>
+  <script src="app.js"></script>
+</body>
+</html>

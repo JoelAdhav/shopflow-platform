@@ -1,0 +1,32 @@
+# The nginx image runs envsubst on this file at container start and writes the
+# result to /etc/nginx/conf.d/default.conf. ${API_UPSTREAM} comes from the
+# environment, so the same image works in compose and Kubernetes.
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Static files.
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # /api/products -> http://api:8000/products  (trailing slashes strip the /api prefix)
+    location /api/ {
+        proxy_pass http://${API_UPSTREAM}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 10s;
+    }
+
+    # Health endpoint for nginx itself. Does not depend on the api.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+}
