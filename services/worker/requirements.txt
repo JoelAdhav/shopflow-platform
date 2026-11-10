@@ -1,0 +1,4 @@
+sqlalchemy==2.1.8
+psycopg[binary]==3.3.8
+redis==8.1.0
+prometheus-client==0.26.0
