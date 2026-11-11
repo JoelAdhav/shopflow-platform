@@ -35,3 +35,31 @@ and how I fixed it. One section per phase.
 6. **Images are 250-275MB on disk, not tiny.**
    Most of it is the Debian slim base plus SQLAlchemy and the Postgres driver. Removing pip
    from the runtime venv saved 13MB. Trade-off is recorded in ADR 0003.
+
+## Phase 2: CI
+
+### What broke and how I fixed it
+
+1. **First Trivy scan failed on all three images, although every tag was the newest available.**
+   - api and worker: `zlib1g` (2 HIGH) in Debian, plus `urllib3`, `msgpack`, `setuptools` (5 HIGH).
+   - web: `curl`, `libexpat`, `libxslt`, `musl`, `zlib`, `brotli-libs` (12 HIGH) in Alpine.
+
+   Lesson: a base image is a snapshot. Fixes released after it was built are not in it.
+   Fix: `apt-get upgrade` / `apk upgrade` in the runtime stage. After that: 0 findings.
+
+2. **Vulnerable Python packages that were not in my requirements.**
+   `urllib3` and `msgpack` were not in my venv. I searched the image filesystem and found them at
+   `/usr/local/lib/python3.13/site-packages/pip/_vendor/`. They belong to the pip that ships with
+   the base image. The app never runs pip, so I delete it in the runtime stage.
+   Lesson: find where a finding lives before deciding how to fix it. Removing unused software beats patching it.
+
+3. **Docker Desktop was stopped again between sessions.**
+   Same `failed to connect to the docker API` error as Phase 1. Start Docker Desktop first.
+
+### Design note: patching a non-root image
+The nginx image runs as UID 101, and `apk upgrade` needs root. The Dockerfile switches to
+`USER root` for that one `RUN`, then back to `USER 101`. The container still runs as UID 101.
+
+### Not verified yet
+The workflow file passes `actionlint`, and every command in it was run locally with the same
+result. The workflow itself has not run on GitHub yet: that needs the first push.
