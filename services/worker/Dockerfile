@@ -1,5 +1,5 @@
 # Same three-stage layout as services/api/Dockerfile. Comments there explain each stage.
-FROM python:3.13.18-slim-trixie AS builder
+FROM python:3.15.0-slim-trixie AS builder
 WORKDIR /build
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
@@ -19,7 +19,7 @@ COPY worker ./worker
 COPY tests ./tests
 CMD ["sh", "-c", "ruff check . && pytest -v"]
 
-FROM python:3.13.18-slim-trixie AS runtime
+FROM python:3.15.0-slim-trixie AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
