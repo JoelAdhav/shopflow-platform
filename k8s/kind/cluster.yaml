@@ -1,0 +1,35 @@
+# kind = "Kubernetes in Docker". Each Kubernetes node is one Docker container.
+# Create:  kind create cluster --config k8s/kind/cluster.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: shopflow
+nodes:
+  - role: control-plane
+    # Node image pinned by version AND digest: the Kubernetes version can never
+    # change under us. v1.36 matches the local kubectl client (v1.36.1).
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+    # kubeadm is the tool kind uses inside the node to start Kubernetes.
+    # Two patches, both needed on this laptop (see docs/lessons-learned.md):
+    kubeadmConfigPatches:
+      # 1. Docker Desktop here runs on cgroup v1 (WSL2 kernel 5.15). Since
+      #    Kubernetes 1.35 the kubelet exits on cgroup v1 unless this is false.
+      #    Proper fix: "wsl --update" to get a kernel with cgroup v2.
+      - |
+        kind: KubeletConfiguration
+        failCgroupV1: false
+      # 2. The control plane needs ~50s to start here; kubeadm's default
+      #    1 minute wait was too tight. Give it 5 minutes.
+      - |
+        kind: InitConfiguration
+        timeouts:
+          controlPlaneComponentHealthCheck: 5m0s
+          kubernetesAPICall: 5m0s
+    # The ingress controller is scheduled only on nodes with this label.
+    labels:
+      ingress-ready: "true"
+    # Windows browser -> localhost:8090 -> port 80 inside the node container,
+    # where the ingress controller listens. 8080 stays free for docker compose.
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 8090
+        protocol: TCP
