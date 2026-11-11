@@ -1,5 +1,7 @@
 # shopflow-platform
 
+[![ci](https://github.com/JoelAdhav/shopflow-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/JoelAdhav/shopflow-platform/actions/workflows/ci.yml)
+
 A small online shop (3 services, Postgres, Redis) that I run the way a production
 team would: containers, CI, Kubernetes, GitOps, monitoring, safe deploys, chaos
 tests and security checks. The app is simple on purpose. The platform around it
@@ -94,7 +96,7 @@ full git SHA, never `latest`, so every running container maps to exactly one com
 ## Phases
 
 - [x] 1. Local run (Docker Compose)
-- [x] 2. CI (GitHub Actions, Trivy, GHCR) - verified locally; first run on GitHub pending first push
+- [x] 2. CI (GitHub Actions, Trivy, GHCR)
 - [ ] 3. Kubernetes (kind, Helm, ingress)
 - [ ] 4. GitOps CD (ArgoCD)
 - [ ] 5. Observability (Prometheus, Grafana, Loki, alerts)
