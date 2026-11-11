@@ -7,7 +7,7 @@ team would: containers, CI, Kubernetes, GitOps, monitoring, safe deploys, chaos
 tests and security checks. The app is simple on purpose. The platform around it
 is the project. Every phase below is a working, demoable step.
 
-## Architecture (Phase 1: local run)
+## Architecture: the app (Phase 1, Docker Compose)
 
 ```mermaid
 flowchart LR
@@ -39,6 +39,10 @@ still accepts the order, and the worker's sweep processes it later from Postgres
 | Trivy | 0.76.2 | One open-source scanner for OS packages and Python packages; easy to run locally too. |
 | GHCR | - | Registry in the same place as the repo; the built-in `GITHUB_TOKEN` can push, no stored secret. |
 | Dependabot | - | Exact pins go stale; it opens PRs for new versions and CI tests them. |
+| kind | 0.33.0 (node v1.36.4) | Real Kubernetes in Docker, free, and the cluster definition is a file in git. |
+| Helm | 4.3.1 | One templated chart, two values files: dev and prod cannot drift apart. |
+| Gateway API | v1.6.3 | Official successor to Ingress; splits "entry point" (platform) from "route" (app). |
+| Traefik | 3.7.17 (chart 42.3.2) | Maintained Gateway API controller. ingress-nginx, the original plan, is archived. |
 
 ## Quickstart
 
@@ -70,6 +74,46 @@ Open http://localhost:8080 (shop) or http://localhost:8000/docs (API docs).
 | api | http://localhost:8000/metrics | Prometheus metrics |
 | worker | http://localhost:9100/metrics | Prometheus metrics (queue depth, processed orders) |
 
+## Kubernetes (Phase 3)
+
+```mermaid
+flowchart TB
+    B[Browser<br/>dev.shopflow.localhost:8090<br/>prod.shopflow.localhost:8090]
+    subgraph kind[kind cluster: one node, Kubernetes v1.36.4]
+        subgraph tns[namespace: traefik]
+            GW[Gateway + Traefik<br/>hostPort 80]
+        end
+        subgraph dev[namespace: shopflow-dev]
+            R1[HTTPRoute] --> W1[web x1] --> A1[api x1]
+            A1 --> P1[(postgres-0<br/>PVC 1Gi)]
+            A1 --> D1[(redis)] --> K1[worker x1] --> P1
+        end
+        subgraph prod[namespace: shopflow-prod]
+            R2[HTTPRoute] --> W2[web x2] --> A2[api x2]
+            A2 --> P2[(postgres-0<br/>PVC 1Gi)]
+            A2 --> D2[(redis)] --> K2[worker x2] --> P2
+        end
+    end
+    B --> GW
+    GW -->|host: dev...| R1
+    GW -->|host: prod...| R2
+```
+
+One Helm chart ([charts/shopflow](charts/shopflow)), deployed twice with different values.
+Needs kind 0.33.0 and Helm 4.3.1 (`winget install Kubernetes.kind --version 0.33.0`,
+`winget install Helm.Helm --version 4.3.1`).
+
+```powershell
+.\tasks.ps1 k8s-up       # cluster + Gateway API + Traefik + dev + prod (about 5 minutes)
+.\tasks.ps1 k8s-smoke    # place an order in dev and prod through the gateway
+.\tasks.ps1 k8s-status
+.\tasks.ps1 k8s-deploy   # after a code change: rebuild, load, rolling upgrade
+.\tasks.ps1 k8s-down
+```
+
+Open http://dev.shopflow.localhost:8090 and http://prod.shopflow.localhost:8090.
+Stop the compose stack first (`.\tasks.ps1 down`) if the laptop is short on memory.
+
 ## CI pipeline (Phase 2)
 
 ```mermaid
@@ -97,7 +141,7 @@ full git SHA, never `latest`, so every running container maps to exactly one com
 
 - [x] 1. Local run (Docker Compose)
 - [x] 2. CI (GitHub Actions, Trivy, GHCR)
-- [ ] 3. Kubernetes (kind, Helm, ingress)
+- [x] 3. Kubernetes (kind, Helm, Gateway API with Traefik, dev and prod namespaces)
 - [ ] 4. GitOps CD (ArgoCD)
 - [ ] 5. Observability (Prometheus, Grafana, Loki, alerts)
 - [ ] 6. Safe deployments (Argo Rollouts canary, k6)

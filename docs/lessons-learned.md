@@ -83,3 +83,53 @@ The nginx image runs as UID 101, and `apk upgrade` needs root. The Dockerfile sw
    Green CI on a major database bump proves little here: the tests use SQLite and a fake Redis.
    A Postgres major upgrade also needs a data migration (`pg_upgrade` or dump and restore); the
    existing volume would not start on 18. These PRs need a human decision, not auto-merge.
+
+## Phase 3: Kubernetes
+
+### What broke and how I fixed it
+
+1. **`kind create cluster` failed: `could not bootstrap the admin user ... context deadline exceeded`.**
+   Two separate causes, found one at a time:
+   - The kubelet exited with `kubelet is configured to not run on a host using cgroup v1`.
+     Docker Desktop here uses an old WSL2 kernel (5.15) with cgroup v1, and Kubernetes 1.35+
+     refuses that by default. Fix: `failCgroupV1: false` in the kind config. Better fix: `wsl --update`.
+   - With that fixed, the control-plane containers needed about 50s to start and kubeadm's
+     1 minute wait ran out 4s after the API server came up. Fix: raise kubeadm timeouts to 5m,
+     and stop the compose stack first to free CPU and memory.
+
+   My first guess (cgroups) looked wrong after the first fix did not help, then turned out to
+   be one of two real causes. I proved each by removing one fix at a time.
+   Lesson: read the logs inside the node (`docker exec shopflow-control-plane journalctl -u kubelet`)
+   and use `kind create cluster --retain` so the failed node is kept for inspection.
+
+2. **ingress-nginx is archived.** See ADR 0006. Lesson: check that a tool
+   is still maintained before adopting it, even when every tutorial uses it.
+
+3. **`helm install traefik` failed: `at '/service': additional properties 'type' not allowed`.**
+   I wrote `service.type`; this chart version wants `service.spec.type`. The chart ships a JSON
+   schema, so the typo was rejected before anything was installed. Fix: `helm show values` and
+   use the real key.
+
+4. **api pods restarted 2 to 4 times on first deploy.**
+   `kubectl logs --previous` showed `connection to server ... port 5432 failed: Connection refused`,
+   then `Application startup failed. Exiting.` Kubernetes starts all pods at once; the api came up
+   before Postgres and crashed. Compose had hidden this with `depends_on`.
+   Fix: the api retries the database connection for up to 2 minutes, and the startup probe allows
+   the same time. After the fix: 0 restarts on a fresh deploy.
+   Lesson: in Kubernetes every service must tolerate its dependencies being late.
+
+5. **Two api replicas starting together could seed products twice.**
+   Found by reasoning before deploying prod with 2 replicas. Fix: a Postgres advisory lock
+   (`pg_advisory_xact_lock`) around table creation and seeding. Verified: prod has exactly 3 products.
+
+6. **`Invoke-RestMethod : The remote name could not be resolved: 'dev.shopflow.localhost'`.**
+   Browsers and curl resolve any `*.localhost` name to 127.0.0.1 themselves. Windows PowerShell
+   asks Windows DNS, which does not. Fix: the smoke task uses `curl.exe`.
+
+7. **`.gitignore` had `secrets/`, which would also have ignored `k8s/secrets/dev.env.example`.**
+   Changed to `k8s/secrets/*.env`. Verified with `git status` that only the example is tracked.
+
+### Honest limits
+- Control-plane pods (scheduler, controller-manager) restarted a few times while the cluster
+  was under load. The laptop gives Docker 8GB; the cluster plus compose stack is tight.
+- No TLS, single node, single Postgres. Listed in ADRs 0005 to 0007.
