@@ -1,5 +1,5 @@
 # ---- Stage 1: builder. Installs dependencies into a virtualenv. ----
-FROM python:3.13.18-slim-trixie AS builder
+FROM python:3.15.0-slim-trixie AS builder
 WORKDIR /build
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
@@ -23,7 +23,7 @@ COPY tests ./tests
 CMD ["sh", "-c", "ruff check . && pytest -v"]
 
 # ---- Stage 3: runtime. Only the venv and the app code. ----
-FROM python:3.13.18-slim-trixie AS runtime
+FROM python:3.15.0-slim-trixie AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
