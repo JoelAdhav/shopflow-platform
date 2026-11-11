@@ -1,0 +1,105 @@
+# CI pipeline.
+#   Pull request : lint -> test -> build images -> Trivy scan
+#   Push to main : the same, then push images to GHCR tagged with the git SHA
+#
+# Every step runs the same commands as .\tasks.ps1 test / build / scan locally.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Default token permissions for all jobs: read-only (least privilege).
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the older, now useless run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.76.2
+
+jobs:
+  lint-test:
+    name: lint + test (${{ matrix.service }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false          # show failures of both services, not only the first
+      matrix:
+        service: [api, worker]
+    env:
+      SERVICE: ${{ matrix.service }}
+    steps:
+      # Actions are pinned to a full commit SHA. A tag like v7 can be moved to
+      # malicious code; a SHA cannot. The comment records the human version.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Dockerfile "test" stage holds ruff + pytest, so CI and laptop use
+      # the exact same tool versions.
+      - name: Build test image
+        run: docker build --target test -t test-image "services/${SERVICE}"
+
+      - name: Lint (ruff)
+        run: docker run --rm test-image ruff check .
+
+      - name: Test (pytest)
+        run: docker run --rm test-image pytest -v
+
+  build-scan-push:
+    name: build + scan (${{ matrix.service }})
+    needs: lint-test            # do not build images from code that fails tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write           # needed to push to GHCR; only this job gets it
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, worker, web]
+    env:
+      SERVICE: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compute image name
+        # GHCR image names must be lowercase; ${VAR,,} lowercases in bash.
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/shopflow-${SERVICE}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: services/${{ matrix.service }}
+          tags: ${{ env.IMAGE }}
+          load: true            # keep the image on the runner so Trivy can scan it
+          push: false           # never push before the scan passes
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+      - name: Scan image (Trivy)
+        # --exit-code 1 fails the job on any HIGH/CRITICAL finding that has a fix.
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            "$TRIVY_IMAGE" image --quiet --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # built-in, short-lived; no stored secret
+
+      - name: Push image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker push "$IMAGE"

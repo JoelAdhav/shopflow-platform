@@ -1,0 +1,19 @@
+# Everything is pinned to exact versions. Pins go stale and collect CVEs, so
+# Dependabot opens a PR when a newer version exists. CI then tests that PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: pip
+    directories: [/services/api, /services/worker]
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker
+    directories: [/services/api, /services/worker, /services/web]
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
