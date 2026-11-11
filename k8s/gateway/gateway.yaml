@@ -1,0 +1,23 @@
+# Gateway = the shared HTTP entry point of the cluster.
+#   GatewayClass "traefik"  -> which controller implements it (created by the Traefik chart)
+#   Gateway      (this file) -> which ports/protocols are open, and who may attach routes
+#   HTTPRoute    (in the app chart) -> hostname -> Service
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shopflow
+  namespace: traefik
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: web
+      protocol: HTTP
+      port: 8000            # must equal Traefik's "web" entry point port
+      allowedRoutes:
+        namespaces:
+          # Only namespaces carrying this label may attach routes. A team in
+          # another namespace cannot hijack traffic by creating an HTTPRoute.
+          from: Selector
+          selector:
+            matchLabels:
+              shopflow.io/gateway-access: "true"

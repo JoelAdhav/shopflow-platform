@@ -1,0 +1,9 @@
+# See shopflow-dev.yaml for what each label does.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shopflow-prod
+  labels:
+    shopflow.io/env: prod
+    shopflow.io/gateway-access: "true"
+    pod-security.kubernetes.io/enforce: restricted

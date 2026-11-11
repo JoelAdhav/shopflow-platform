@@ -1,0 +1,49 @@
+# Values for the Traefik Helm chart (traefik/traefik 42.3.2, Traefik v3.7.17).
+# Traefik is the controller: the program that reads Gateway and HTTPRoute
+# objects and actually forwards the traffic.
+deployment:
+  replicas: 1
+
+providers:
+  kubernetesGateway:
+    enabled: true      # watch Gateway API objects
+  kubernetesIngress:
+    enabled: false     # we do not use the older Ingress API
+  kubernetesCRD:
+    enabled: false     # nor Traefik's own IngressRoute objects
+
+# We write the Gateway ourselves (gateway.yaml) to see every field.
+gateway:
+  enabled: false
+gatewayClass:
+  enabled: true
+  name: traefik
+ingressClass:
+  enabled: false
+ingressRoute:
+  dashboard:
+    enabled: false
+
+ports:
+  web:
+    # Traefik listens on 8000 in its container. hostPort publishes it as port 80
+    # of the kind node, which cluster.yaml maps to localhost:8090 on Windows.
+    hostPort: 80
+  websecure:
+    expose:
+      default: false   # no HTTPS locally
+
+service:
+  spec:
+    type: ClusterIP    # kind has no cloud load balancer; hostPort does the job
+
+nodeSelector:
+  ingress-ready: "true"
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { cpu: 300m, memory: 192Mi }

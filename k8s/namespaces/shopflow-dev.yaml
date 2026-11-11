@@ -1,0 +1,13 @@
+# A namespace is a named box inside the cluster. dev and prod get one each, so
+# their pods, secrets and services cannot collide or see each other's secrets.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shopflow-dev
+  labels:
+    shopflow.io/env: dev
+    # Lets HTTPRoutes in this namespace attach to the shared Gateway.
+    shopflow.io/gateway-access: "true"
+    # Pod Security Admission: Kubernetes itself rejects pods that run as root,
+    # allow privilege escalation, etc. ("restricted" is the strictest level).
+    pod-security.kubernetes.io/enforce: restricted
