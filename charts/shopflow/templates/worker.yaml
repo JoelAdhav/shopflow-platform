@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    {{- include "shopflow.labels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "shopflow.selectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "shopflow.labels" (dict "root" . "component" "worker") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      # On shutdown Kubernetes sends SIGTERM, waits this long, then SIGKILL.
+      # The worker finishes its current job on SIGTERM.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: {{ include "shopflow.image" (dict "root" . "component" "worker") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: 9100
+          envFrom:
+            - configMapRef: { name: shopflow-config }
+          env:
+            {{- include "shopflow.databaseEnv" . | nindent 12 }}
+          # The worker serves no user traffic, so one probe is enough:
+          # if the metrics server stops answering, the process is stuck.
+          livenessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /metrics, port: metrics }
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- include "shopflow.containerSecurity" . | nindent 12 }}
+---
+# A Service gives Prometheus (Phase 5) a stable name to scrape.
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  labels:
+    {{- include "shopflow.labels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  selector:
+    {{- include "shopflow.selectorLabels" (dict "root" . "component" "worker") | nindent 4 }}
+  ports:
+    - name: metrics
+      port: 9100
+      targetPort: metrics

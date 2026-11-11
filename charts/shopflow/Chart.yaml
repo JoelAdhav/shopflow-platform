@@ -1,0 +1,8 @@
+apiVersion: v2
+name: shopflow
+description: The whole shopflow app (api, worker, web, postgres, redis) in one chart
+type: application
+# version    = version of this chart (the packaging). Bump when templates change.
+# appVersion = version of the app. Informational; the real image tag is in values.
+version: 0.1.0
+appVersion: "0.1.0"

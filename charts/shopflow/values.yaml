@@ -1,0 +1,57 @@
+# Default values. Environment files (values-dev.yaml, values-prod.yaml) override
+# only what differs. Install:
+#   helm upgrade --install shopflow charts/shopflow -n shopflow-dev -f charts/shopflow/values-dev.yaml
+
+image:
+  # Empty registry = images loaded straight into kind ("kind load docker-image").
+  # Phase 4 sets this to ghcr.io/<owner> and the tag to a git SHA.
+  registry: ""
+  tag: local
+  pullPolicy: IfNotPresent
+
+# Name of a Secret that must already exist in the namespace, with keys
+# POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB. Created by tasks.ps1 from a
+# gitignored file. The chart never contains secret values.
+databaseSecret: shopflow-db
+
+api:
+  replicas: 1
+  seedData: "true"
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+worker:
+  replicas: 1
+  processSeconds: "0.2"
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 192Mi }
+
+web:
+  replicas: 1
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+
+postgres:
+  image: postgres:17.11-alpine3.24
+  storage: 1Gi
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 384Mi }
+
+redis:
+  image: redis:7.4.12-alpine3.22
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+
+# HTTP entry point. The chart creates an HTTPRoute that attaches to a shared
+# Gateway owned by the platform (k8s/gateway/gateway.yaml).
+route:
+  enabled: true
+  host: shopflow.localhost
+  gateway:
+    name: shopflow
+    namespace: traefik

@@ -1,0 +1,8 @@
+shopflow installed in namespace {{ .Release.Namespace }}.
+{{- if .Values.route.enabled }}
+
+  Shop:   http://{{ .Values.route.host }}:8090
+  Ready:  curl.exe http://{{ .Values.route.host }}:8090/api/readyz
+{{- end }}
+
+  Pods:   kubectl get pods -n {{ .Release.Namespace }}

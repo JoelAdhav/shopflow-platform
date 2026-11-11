@@ -1,0 +1,3 @@
+# dev: one replica of everything, small limits.
+route:
+  host: dev.shopflow.localhost

@@ -1,0 +1,16 @@
+# prod: two replicas of each stateless service, so one pod can die or be
+# replaced without downtime. Postgres and Redis stay single (see ADR 0005).
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+worker:
+  replicas: 2
+
+web:
+  replicas: 2
+
+route:
+  host: prod.shopflow.localhost

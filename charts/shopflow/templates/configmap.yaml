@@ -1,0 +1,12 @@
+# Non-secret configuration, shared by api and worker through "envFrom".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopflow-config
+  labels:
+    {{- include "shopflow.labels" (dict "root" . "component" "config") | nindent 4 }}
+data:
+  REDIS_URL: redis://redis:6379/0
+  QUEUE_NAME: orders
+  SEED_DATA: {{ .Values.api.seedData | quote }}
+  PROCESS_SECONDS: {{ .Values.worker.processSeconds | quote }}

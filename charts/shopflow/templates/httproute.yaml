@@ -1,0 +1,26 @@
+{{- if .Values.route.enabled }}
+# HTTPRoute (Gateway API) = routing rule: "requests for this hostname go to this
+# Service". It attaches to a Gateway through parentRefs. The Gateway is the
+# shared entry point owned by the platform; the route is owned by the app.
+# Only web is exposed. The api is reached through web's /api proxy.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shopflow
+  labels:
+    {{- include "shopflow.labels" (dict "root" . "component" "route") | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.route.gateway.name }}
+      namespace: {{ .Values.route.gateway.namespace }}
+  hostnames:
+    - {{ .Values.route.host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web
+          port: 80
+{{- end }}
