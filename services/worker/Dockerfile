@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Runtime copy of the venv without pip: 13MB smaller, and an attacker inside
 # the container cannot "pip install" tools.
 RUN cp -a /opt/venv /opt/venv-runtime && \
-    rm -rf /opt/venv-runtime/lib/python3.13/site-packages/pip* /opt/venv-runtime/bin/pip*
+    rm -rf /opt/venv-runtime/lib/python3*/site-packages/pip* /opt/venv-runtime/bin/pip*
 
 FROM builder AS test
 COPY requirements-dev.txt .
@@ -30,7 +30,7 @@ ENV PATH=/opt/venv/bin:$PATH \
 RUN apt-get update && \
     apt-get upgrade -y --no-install-recommends && \
     rm -rf /var/lib/apt/lists/* && \
-    rm -rf /usr/local/lib/python3.13/site-packages/pip* /usr/local/bin/pip*
+    rm -rf /usr/local/lib/python3*/site-packages/pip* /usr/local/bin/pip*
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=builder /opt/venv-runtime /opt/venv
 WORKDIR /srv
