@@ -1,15 +1,17 @@
 """shopflow api: products and orders CRUD."""
 
 import logging
+import time
 from contextlib import asynccontextmanager
 
 import redis
 from fastapi import Depends, FastAPI, HTTPException, Response, status
-from sqlalchemy import select, text
+from sqlalchemy import Engine, insert, select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app import config, metrics, models, schemas
-from app.db import Base, SessionLocal, engine, get_db
+from app.db import Base, engine, get_db
 from app.queue import enqueue_order, get_queue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -22,21 +24,47 @@ SEED_PRODUCTS = [
 ]
 
 
-def seed(db: Session) -> None:
-    if db.scalar(select(models.Product).limit(1)) is None:
-        db.add_all(models.Product(**p) for p in SEED_PRODUCTS)
-        db.commit()
-        log.info("seeded %d products", len(SEED_PRODUCTS))
+def init_db(bind: Engine, seed_data: bool) -> None:
+    """Create tables and (optionally) demo products, in one transaction.
+
+    Fine for two tables; a real project uses migrations (Alembic). See ADR 0003.
+    """
+    with bind.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            # In Kubernetes several api replicas start at the same moment. Without
+            # a lock they race: duplicate seed rows, or "already exists" crashes.
+            # This Postgres lock lets one replica in at a time and is released
+            # automatically when the transaction ends.
+            conn.execute(text("SELECT pg_advisory_xact_lock(727001)"))
+        Base.metadata.create_all(conn)
+        if seed_data and conn.scalar(select(models.Product.id).limit(1)) is None:
+            conn.execute(insert(models.Product), SEED_PRODUCTS)
+            log.info("seeded %d products", len(SEED_PRODUCTS))
+
+
+def init_db_with_retry(bind: Engine, seed_data: bool, attempts: int = 60, delay: float = 2.0):
+    """Wait for the database instead of crashing.
+
+    Kubernetes starts all pods at once, in no order (compose had depends_on).
+    Without this the api exits while Postgres is still starting and is
+    restarted again and again with growing back-off delays.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            init_db(bind, seed_data)
+            return
+        except OperationalError as exc:
+            if attempt == attempts:
+                raise
+            log.warning(
+                "database not ready (attempt %d/%d): %s", attempt, attempts, type(exc).__name__
+            )
+            time.sleep(delay)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Create tables at startup. Fine for two tables; a real project uses
-    # migrations (Alembic). See docs/decisions/0003.
-    Base.metadata.create_all(engine)
-    if config.SEED_DATA:
-        with SessionLocal() as db:
-            seed(db)
+    init_db_with_retry(engine, config.SEED_DATA)
     yield
 
 
