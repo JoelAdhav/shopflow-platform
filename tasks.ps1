@@ -34,6 +34,18 @@ switch ($Task) {
     "ps"     { docker compose ps }
     "logs"   { docker compose logs -f --tail 50 }
     "test"   { Test-Service api; Test-Service worker }
+    "build"  { docker compose build; Assert-Ok "compose build" }
+    "scan"   {
+        # Same check as CI: fail on HIGH/CRITICAL vulnerabilities that have a fix.
+        foreach ($s in "api", "worker", "web") {
+            Write-Host "== trivy: shopflow-${s}:local"
+            docker run --rm -v //var/run/docker.sock:/var/run/docker.sock -v shopflow-trivy-cache:/root/.cache `
+                aquasec/trivy:0.76.2 image --quiet --scanners vuln --severity HIGH,CRITICAL `
+                --ignore-unfixed --exit-code 1 "shopflow-${s}:local"
+            Assert-Ok "trivy found HIGH/CRITICAL vulnerabilities in $s"
+        }
+        Write-Host "scan passed: no fixable HIGH/CRITICAL vulnerabilities"
+    }
     "smoke"  {
         Invoke-RestMethod http://localhost:8080/api/readyz | ConvertTo-Json -Compress
         $order = Invoke-RestMethod -Method Post http://localhost:8080/api/orders -ContentType application/json -Body '{"product_id":1,"quantity":1}'
@@ -51,6 +63,8 @@ switch ($Task) {
         Write-Host "  ps     show container status"
         Write-Host "  logs   follow logs of all services"
         Write-Host "  test   run ruff + pytest for api and worker in containers"
+        Write-Host "  build  build the three images"
+        Write-Host "  scan   Trivy scan of the three images (fails on fixable HIGH/CRITICAL)"
         Write-Host "  smoke  place one order through nginx and check the worker processes it"
     }
 }

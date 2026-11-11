@@ -27,6 +27,14 @@ FROM python:3.13.18-slim-trixie AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
+# Security patching (found by Trivy, see docs/decisions/0004):
+# 1. apt-get upgrade pulls OS fixes released after the base image was built.
+# 2. The base image ships its own pip, which bundles old urllib3/msgpack/setuptools.
+#    The app never runs pip, so remove it.
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /usr/local/lib/python3.13/site-packages/pip* /usr/local/bin/pip*
 # Fixed numeric UID: Kubernetes "runAsNonRoot" can verify a number, not a name.
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=builder /opt/venv-runtime /opt/venv

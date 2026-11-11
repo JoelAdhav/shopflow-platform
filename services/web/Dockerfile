@@ -5,6 +5,11 @@
 # nginx-unprivileged: official nginx variant that runs as UID 101 and listens
 # on 8080 (ports below 1024 need root).
 FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24
+# Pull Alpine security fixes released after the base image was built (found by Trivy).
+# apk needs root, so switch user for one step and switch back.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 ENV API_UPSTREAM=api:8000
 COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY html /usr/share/nginx/html
