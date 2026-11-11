@@ -1,7 +1,8 @@
 # Secrets and local config
 .env
 *.local
-secrets/
+# Real secret files for Kubernetes; only *.env.example is committed.
+k8s/secrets/*.env
 
 # Python
 __pycache__/
