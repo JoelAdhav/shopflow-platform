@@ -146,6 +146,26 @@ ArgoCD pulls the new tag from git.
 The nginx image runs as UID 101, and `apk upgrade` needs root. The Dockerfile switches to
 `USER root` for that one `RUN`, then back to `USER 101`. The container still runs as UID 101.
 
-### Not verified yet
-The workflow file passes `actionlint`, and every command in it was run locally with the same
-result. The workflow itself has not run on GitHub yet: that needs the first push.
+### First run on GitHub
+- Push to `main` (run 42968863916): all 5 jobs green. Scan passed, then login and push ran for
+  api, worker and web. Images are in GHCR tagged with the commit SHA.
+- Dependabot opened 4 PRs within a minute of the first push. On those PR runs the login and
+  push steps show `skipped`: the `if: github.event_name == 'push'` guard works.
+
+### What broke after the first push
+
+4. **Dependabot PR "Bump python from 3.13.18 to 3.15.0" failed the Trivy step.**
+   Lint, tests and build were green; only the scan failed. My Dockerfile deleted the bundled pip
+   with a hardcoded path, `/usr/local/lib/python3.13/site-packages/pip*`. On a 3.15 image that
+   path does not exist, `rm -rf` silently did nothing, pip stayed in the image, and Trivy found
+   its vulnerable vendored packages again.
+   Fix: version-independent glob, `/usr/local/lib/python3*/site-packages/pip*`.
+   Reproduced locally by building the api image on Python 3.15: 6 HIGH findings with the old
+   path, 0 with the glob.
+   Lessons: `rm -rf` on a missing path succeeds silently, so a cleanup step can stop working
+   without any error. The scan gate caught a real regression on a real PR, with nobody reviewing it.
+
+5. **Dependabot proposed major-version jumps (Postgres 17 to 18, Redis 7 to 8, Python 3.13 to 3.15).**
+   Green CI on a major database bump proves little here: the tests use SQLite and a fake Redis.
+   A Postgres major upgrade also needs a data migration (`pg_upgrade` or dump and restore); the
+   existing volume would not start on 18. These PRs need a human decision, not auto-merge.
